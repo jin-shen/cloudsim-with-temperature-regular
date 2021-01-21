@@ -59,6 +59,8 @@ public class Myhost {
     {
         return this.temperature;
     }
+    public int getTotalRam() { return this.totalRam; }
+    public long getTotalBw() { return this.totalBw; }
     public void setId(int id)
     {
         this.Id = id;

@@ -48,9 +48,9 @@ public class Dvfs {
 		List<PowerHost> new_hostList = Helper.createHostList(12);
 		List<Vm> new_vmList = Helper.createVmList(2, 10);
 		String policy[] = {"dvfs","wf","bf,hybrid"};
-		GAS ga = new GAS();
-		ga.initVmList(new_vmList);
-		ga.initHostList(new_hostList);
+		GAS ga = new GAS(new_vmList,new_hostList);
+		ga.initVmList();
+		ga.initHostList();
 //		new PlanetLabRunner(
 //				enableOutput,
 //				outputToFile,
