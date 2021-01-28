@@ -8,6 +8,8 @@ import org.cloudbus.cloudsim.power.PowerHost;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+
 /**
  * A simulation of a heterogeneous power aware data center that only applied DVFS, but no dynamic
  * optimization of the VM allocation. The adjustment of the hosts' power consumption according to
@@ -45,12 +47,26 @@ public class Dvfs {
 		String vmAllocationPolicy = "dvfs"; // DVFS policy without VM migrations
 		String vmSelectionPolicy = "";
 		String parameter = "";
-		List<PowerHost> new_hostList = Helper.createHostList(12);
-		List<Vm> new_vmList = Helper.createVmList(2, 10);
+		List<PowerHost> new_hostList = Helper.createHostList(1024);
+		List<Vm> new_vmList = Helper.createVmList(2, 512);
 		String policy[] = {"dvfs","wf","bf,hybrid"};
 		GAS ga = new GAS(new_vmList,new_hostList);
 		ga.initVmList();
 		ga.initHostList();
+		ga.initpop();
+		Random random = new Random();
+		for(int i = 0;i < 5000;i++)
+            {
+            	double r1 = random.nextDouble();
+            	double r2 = random.nextDouble();
+            	if(r1 < 0.6)
+				ga.cross();
+            	if(r2 <0.2)
+				ga.mutation();
+            	ga.select();
+            	ga.generation = i;
+//                Log.printLine(i + " round");
+            }
 //		new PlanetLabRunner(
 //				enableOutput,
 //				outputToFile,

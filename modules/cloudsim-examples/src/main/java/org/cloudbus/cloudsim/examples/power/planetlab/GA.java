@@ -1,5 +1,7 @@
 package org.cloudbus.cloudsim.examples.power.planetlab;
 
+import org.cloudbus.cloudsim.Log;
+
 public class GA {
 
     private int ChrNum = 10;    //染色体数量
@@ -73,6 +75,7 @@ public class GA {
                 bestfitness = evals[i];
                 bestgenerations = generation;
                 beststr = ipop[i];
+                Log.printLine("第" + this.generation+"代为最佳");
             }
 
             F = F + evals[i]; // 所有染色体适应值总和

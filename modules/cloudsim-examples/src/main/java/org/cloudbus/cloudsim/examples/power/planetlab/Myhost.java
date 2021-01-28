@@ -71,6 +71,6 @@ public class Myhost {
     }
     public void updateCpu(int cpu)
     {
-        this.avaliableCpu+=cpu;
+        this.avaliableCpu-=cpu;
     }
 }

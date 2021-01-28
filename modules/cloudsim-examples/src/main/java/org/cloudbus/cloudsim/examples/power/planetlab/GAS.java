@@ -1,33 +1,35 @@
 package org.cloudbus.cloudsim.examples.power.planetlab;
 
 
+import org.cloudbus.cloudsim.Log;
 import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.power.PowerHost;
 import org.cloudbus.cloudsim.power.models.PowerModel;
-import org.cloudbus.cloudsim.power.models.PowerModelSpecPowerHpProLiantMl110G4Xeon3040;
+import org.cloudbus.cloudsim.power.models.PowerModelCubic;
 
 import java.util.*;
 
 public class GAS {
     private int ChrNum = 30;
     private String[] ipop = new String[ChrNum];
-    private int generation = 0;
+    public int generation = 0;
     public static final int GENE = GAConfig.GENE;
     private double bestfitness = Double.MAX_VALUE;
-    private int bestgeneration;
+    public int bestgeneration;
     private String beststr;
-    private List<Myhost> myhostList;
+    private List<Myhost> myhostList = new ArrayList<>();
     private double avgTemper;
-    private static List<Vm> GaVmList;
-    private static List<PowerHost> GaHostList;
-    protected static List<PowerHost> hostList;
+    private static List<Vm> GaVmList = new ArrayList<>();
+    private static List<PowerHost> GaHostList = new ArrayList<>();
+//    protected static List<PowerHost> hostList = new ArrayList<>();
     private  List<List<Vm>> vmList = new ArrayList<List<Vm>>();
     private int[][]  vmTohost= new int[ChrNum][GAConfig.VMNum];
     private Map<Double,int[]> MinEnergy = new TreeMap<>();
-    PowerModel model = new PowerModelSpecPowerHpProLiantMl110G4Xeon3040();
+//    PowerModel model = new PowerModelSpecPowerHpProLiantMl110G4Xeon3040();
+    PowerModel model = new PowerModelCubic(200,0.3);
     private Float[] initTemper = new Float[GAConfig.HostNum];
-    private int MBest = 20;
-    private Queue<vmTohostWithEmergy> bestPop = new PriorityQueue<>();
+    private int MBest = 1;
+    private PriorityQueue<vmTohostWithEmergy> bestPop = new PriorityQueue<>();
     private int[] besttuple;
 
     public GAS(List<Vm> temvmList, List<PowerHost> hostList)
@@ -37,15 +39,15 @@ public class GAS {
     }
     public void initVmList()
     {
-        List<Vm> temvmList = new ArrayList<>();
-        for(Vm vm : GaVmList)
-            temvmList.add(vm.clone());
         for(int i = 0;i<ChrNum;i++)
         {
+            List<Vm> temvmList = new ArrayList<>();
+            for(Vm vm : GaVmList)
+                temvmList.add(vm.clone());
             Random randonm = new Random();
-            for(int j = 0;j < 512;j++)
+            for(int j = 0;j < GAConfig.VMNum;j++)
             {
-                int randomPos = randonm.nextInt(511);
+                int randomPos = randonm.nextInt(GAConfig.VMNum-1);
                 Vm tempVm = temvmList.get(j);
                 temvmList.set(j, temvmList.get(randomPos));
                 temvmList.set(randomPos,tempVm);
@@ -68,6 +70,7 @@ public class GAS {
             temHost.setAvaliableCpu(host.getTotalMips());
             temHost.setAvaliableRam(host.getRam());
             temHost.setAvaliableBw(host.getBw());
+            temHost.setId(host.getId());
             myhostList.add(temHost);
             avgTemper += host.getTemperature();
             initTemper[i] = host.getTemperature();
@@ -82,24 +85,30 @@ public class GAS {
         {
             for(int vms = 0;vms < GAConfig.VMNum;vms++)
             {
-                double minTemper = Double.MAX_VALUE;
+                double maxTemper = Double.MIN_VALUE;
                 int targetHostId = -1;
                 int vmId = vmList.get(i).get(vms).getId();
+                double targetTemper = 0;
                 for(int hosts = 0;hosts < GAConfig.HostNum;hosts++)
                 {
-                    if(isSuitable(vmList.get(i).get(hosts), myhostList.get(hosts)))
+                    if(isSuitable(vmList.get(i).get(vms), myhostList.get(hosts)))
                     {
-                        double temper = calculateTemper(myhostList.get(hosts) ,vmList.get(i).get(vms));
-                        if(minTemper > temper)
+                        double temper[] = calculateTemper(myhostList.get(hosts) ,vmList.get(i).get(vms));
+                        if(maxTemper < temper[0])
                         {
-                            minTemper = temper;
+                            maxTemper = temper[0];
                             targetHostId = myhostList.get(hosts).getId();
+                            targetTemper = temper[1];
                         }
                     }
+                    if(hosts == GAConfig.HostNum && targetTemper == 0)
+                        Log.printLine("no sutitable host for vm");
                 }
-                myhostList.get(targetHostId).setAvaliableCpu((int) (myhostList.get(targetHostId).getAvaliableCpu() + vmList.get(i).get(vms).getMips()));
+                myhostList.get(targetHostId).setAvaliableCpu((int) (myhostList.get(targetHostId).getAvaliableCpu() - vmList.get(i).get(vms).getMips()));
+                myhostList.get(targetHostId).setAvaliableRam((myhostList.get(targetHostId).getAvaliableRam() - vmList.get(i).get(vms).getRam()));
+                myhostList.get(targetHostId).setAvaliableBw((myhostList.get(targetHostId).getAvaliableBw() - vmList.get(i).get(vms).getBw()));
                 vmTohost[i][vmId] = targetHostId;
-                myhostList.get(targetHostId).setTemperature(minTemper);
+                myhostList.get(targetHostId).setTemperature(targetTemper);
             }
             Double curPower = 0.0;
             for(Myhost host : myhostList)
@@ -109,6 +118,7 @@ public class GAS {
             if(bestPop.size() < MBest)
             {
                 vmTohostWithEmergy temp = new vmTohostWithEmergy(curPower,vmTohost[i]);
+//                bestPop.add(temp);
                 bestPop.add(temp);
             }
             else
@@ -120,6 +130,9 @@ public class GAS {
                 }
             }
             ipop[i] = code(vmTohost[i]);
+            clearHost();
+            System.out.printf(i + "  round complete");
+            Log.printLine();
         }
     }
 
@@ -137,7 +150,7 @@ public class GAS {
         String tem1,tem2;
         for(int i = 0;i < ChrNum ;i++)
         {
-            int pos = (int)(Math.random() * GAConfig.VMNum * Math.sqrt(GAConfig.HostNum));
+            int pos = (int)(Math.random() * GAConfig.VMNum * Math.log(GAConfig.HostNum) / Math.log(2));
 //            int select = (int)(Math.random() * MBest);
             tem1 = ipop[i].substring(0,pos) + code(bestPop.peek().vmTohost).substring(pos);
             ipop[i] = tem1;
@@ -156,6 +169,7 @@ public class GAS {
             String temp;
             int GenNum = (int) (Math.random() * ChrNum);
             int pos = (int) (Math.random() * GAConfig.GENE);
+//            Log.printLine("ipop[i] length is" + ipop[GenNum].length());
             if(ipop[GenNum].charAt(pos) == '0')
                 a = '1';
             else
@@ -164,10 +178,10 @@ public class GAS {
                 temp = a + ipop[GenNum].substring(pos + 1);
             else
             {
-                if(pos != GAConfig.GENE * ChrNum -1)
-                    temp = a + ipop[GenNum].substring(pos);
+                if(pos == GAConfig.GENE -1)
+                    temp = ipop[GenNum].substring(0,GAConfig.GENE -1) + a;
                 else
-                    temp = ipop[GenNum].substring(0,pos) + a + ipop[GenNum].substring(pos);
+                    temp = ipop[GenNum].substring(0,pos) + a + ipop[GenNum].substring(pos+1);
             }
             ipop[GenNum] = temp;
         }
@@ -197,6 +211,7 @@ public class GAS {
                 bestfitness = evals[i];
                 bestgeneration = generation;
                 beststr = code(vmTohost[i]);
+                Log.printLine("get best result in generation:" + this.generation);
             }
             F = F + evals[i];
         }
@@ -242,22 +257,29 @@ public class GAS {
     {
         double energy = 0.0;
         double temper = 0.0;
+//        double temppp = 0.0;
+//        double utila = 0;
         if(isSuitable(allocate)) {
             for (int i = 0; i < GAConfig.VMNum; i++) {
                 myhostList.get(allocate[i]).updateCpu((int) GaVmList.get(i).getMips());
             }
             for (Myhost host : myhostList) {
+//                utila= getUtilization(host);
                 energy += model.getPower(getUtilization(host));
                 temper += host.getTemperature() / (60 - calculateTemper((double) getUtilization(host)));
+//                temppp = host.getTemperature();
             }
-            clearHost();
         }
-        return  energy + temper;
+        clearHost();
+        double rere = energy + temper*15;
+        return  energy + temper*15;
     }
 
-    public int getUtilization(Myhost myhost)
+    public double getUtilization(Myhost myhost)
     {
-        return (myhost.getTotalCpu()-myhost.getAvaliableCpu()) / myhost.getTotalCpu();
+//        int a = myhost.getTotalCpu()-myhost.getAvaliableCpu();
+//        int b = myhost.getTotalCpu();
+        return ((double)(myhost.getTotalCpu()-myhost.getAvaliableCpu()) / myhost.getTotalCpu());
     }
     public void clearHost()
     {
@@ -265,8 +287,8 @@ public class GAS {
         for(Myhost host : myhostList)
         {
             host.setAvaliableCpu(host.getTotalCpu());
-            host.setAvaliableRam(host.getAvaliableRam());
-            host.setAvaliableBw(host.getAvaliableBw());
+            host.setAvaliableRam(host.getTotalRam());
+            host.setAvaliableBw(host.getTotalBw());
             host.setTemperature(initTemper[i]);
             i++;
         }
@@ -275,8 +297,10 @@ public class GAS {
 
     public boolean isSuitable(Vm vm,Myhost myhost)
     {
-        return (vm.getBw() <= myhost.getAvaliableBw()) && (vm.getMips() <= myhost.getAvaliableCpu()) &&
+        boolean res = (vm.getBw() <= myhost.getAvaliableBw()) && (vm.getMips() <= myhost.getAvaliableCpu()) &&
                 (vm.getRam() <= myhost.getAvaliableRam());
+        return ((vm.getBw() <= myhost.getAvaliableBw()) && (vm.getMips() <= myhost.getAvaliableCpu()) &&
+                (vm.getRam() <= myhost.getAvaliableRam()));
     }
     public boolean isSuitable(int[] vmtohost)
     {
@@ -294,16 +318,19 @@ public class GAS {
         return true;
     }
 
-    public double calculateTemper(Myhost myhost, Vm vm)
+    public double[] calculateTemper(Myhost myhost, Vm vm)
     {
         double cpuUtilization = (double) (myhost.getTotalCpu()-myhost.getAvaliableCpu()+vm.getMips())/myhost.getTotalCpu();
 //        int cpuUtilization = myhost.getTotalCpu()-myhost.getAvaliableCpu()-;
+        double res[] = {0,0};
         float a = (float) 32.4031331148812;
         float b = (float) -0.105871112063592;
         float c = (float) 0.019012207217;
         float d = (float) -0.000103336673855697;
         double targetTemper = a + b * cpuUtilization + Math.pow(c,2) * cpuUtilization + Math.pow(d,3) * cpuUtilization;
-        return targetTemper + myhost.getTemperature() - avgTemper;
+        res[0] = Math.abs(myhost.getTemperature()-avgTemper) + Math.abs(targetTemper - avgTemper);
+        res[1] = targetTemper;
+        return res;
     }
 
     public double calculateTemper(Double utilization)
@@ -321,16 +348,18 @@ public class GAS {
     public String code(int[] pop)
     {
         String temp = "";
-        String res = new String();
+        String res = "";
+        int len2 = (int)(Math.log(GAConfig.HostNum) / Math.log(2));
         for(int gen:pop)
         {
             temp = Integer.toBinaryString(gen);
-            if(temp.length() < Math.sqrt(GAConfig.HostNum))
+            int len = temp.length();
+            if(len < len2)
             {
-                for(int i = 0;i<temp.length();i++)
+                for(int i = 0;i<len2-len;i++)
                     temp = "0" + temp;
             }
-            res.concat(temp);
+            res = res + temp;
         }
         return res;
     }
