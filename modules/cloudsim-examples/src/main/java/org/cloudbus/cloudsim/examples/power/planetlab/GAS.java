@@ -7,6 +7,7 @@ import org.cloudbus.cloudsim.power.PowerHost;
 import org.cloudbus.cloudsim.power.models.PowerModel;
 import org.cloudbus.cloudsim.power.models.PowerModelCubic;
 
+import java.io.*;
 import java.util.*;
 
 public class GAS {
@@ -31,11 +32,16 @@ public class GAS {
     private int MBest = 1;
     private PriorityQueue<vmTohostWithEmergy> bestPop = new PriorityQueue<>();
     private int[] besttuple;
+    private File fe;
+    private int calTime;
+    private int[] best;
 
     public GAS(List<Vm> temvmList, List<PowerHost> hostList)
     {
         GaHostList.addAll(hostList);
         GaVmList.addAll(temvmList);
+        this.fe = new File("E:\\cloudsim\\cloudsim-cloudsim-4.0\\modules\\cloudsim-examples\\src\\main\\java\\org\\cloudbus\\cloudsim\\examples\\power\\planetlab\\result.txt");
+        calTime = 0;
     }
     public void initVmList()
     {
@@ -104,6 +110,7 @@ public class GAS {
                     if(hosts == GAConfig.HostNum && targetTemper == 0)
                         Log.printLine("no sutitable host for vm");
                 }
+//                Log.printLine("targetHostId is" + targetHostId);
                 myhostList.get(targetHostId).setAvaliableCpu((int) (myhostList.get(targetHostId).getAvaliableCpu() - vmList.get(i).get(vms).getMips()));
                 myhostList.get(targetHostId).setAvaliableRam((myhostList.get(targetHostId).getAvaliableRam() - vmList.get(i).get(vms).getRam()));
                 myhostList.get(targetHostId).setAvaliableBw((myhostList.get(targetHostId).getAvaliableBw() - vmList.get(i).get(vms).getBw()));
@@ -152,7 +159,7 @@ public class GAS {
         {
             int pos = (int)(Math.random() * GAConfig.VMNum * Math.log(GAConfig.HostNum) / Math.log(2));
 //            int select = (int)(Math.random() * MBest);
-            tem1 = ipop[i].substring(0,pos) + code(bestPop.peek().vmTohost).substring(pos);
+            tem1 = ipop[i].substring(0,pos) + code(best).substring(pos);
             ipop[i] = tem1;
         }
     }
@@ -196,25 +203,31 @@ public class GAS {
     /*
     待改
      */
-    public void select()
-    {
+    public void select() throws IOException {
         double evals[] = new double[ChrNum];
         double p[] = new double[ChrNum];
         double q[] = new double[ChrNum];
         double F = 0;
         double G = 0;
+        calTime++;
+//        FileWriter fw = new FileWriter(fe.getAbsoluteFile());
+        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fe,true),"UTF-8"));
         for(int i = 0;i<ChrNum;i++)
         {
             evals[i] = getFitness(vmTohost[i]);
+            bw.write(String.valueOf(evals[i]));
+            bw.write("\n");
             if(evals[i] < bestfitness)
             {
                 bestfitness = evals[i];
                 bestgeneration = generation;
                 beststr = code(vmTohost[i]);
                 Log.printLine("get best result in generation:" + this.generation);
+                best = vmTohost[i].clone();
             }
             F = F + evals[i];
         }
+        bw.close();
         for(int i = 0;i<ChrNum;i++)
         {
             evals[i] = F/evals[i];
@@ -349,7 +362,7 @@ public class GAS {
     {
         String temp = "";
         String res = "";
-        int len2 = (int)(Math.log(GAConfig.HostNum) / Math.log(2));
+        int len2 = (int)Math.ceil((Math.log(GAConfig.HostNum) / Math.log(2)));
         for(int gen:pop)
         {
             temp = Integer.toBinaryString(gen);
